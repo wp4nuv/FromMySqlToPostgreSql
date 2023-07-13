@@ -1,5 +1,7 @@
 <?php
 
+namespace App;
+
 /*
  * This file is a part of "FromMySqlToPostgreSql" - the database migration tool.
  *
@@ -26,7 +28,6 @@
  */
 class ViewGenerator
 {
-
     /**
      * The purpose of explicit private constructor is
      * to prevent an instance initialization.
@@ -59,7 +60,7 @@ class ViewGenerator
                 ('from' == strtolower($arrMySqlViewCode[$i]) || 'join' == strtolower($arrMySqlViewCode[$i]))
                 && ($i + 1 < $intMySqlViewCodeCount)
             ) {
-                // This code only handles a single set of ( in the code, we assume MySQL outputs the same way always.
+                // This code only handles a single set of "(" in the code, we assume MySQL outputs the same way always.
                 // Tables might be prefixed by (, so take care of that.
                 $bracketSize = strpos($arrMySqlViewCode[$i + 1], '"');
                 $brackets = $bracketSize == 0 ? '' : substr($arrMySqlViewCode[$i + 1], 0, $bracketSize);

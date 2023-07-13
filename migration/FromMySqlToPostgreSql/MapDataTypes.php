@@ -1,5 +1,7 @@
 <?php
 
+namespace App;
+
 /*
  * This file is a part of "FromMySqlToPostgreSql" - the database migration tool.
  *
@@ -30,7 +32,6 @@ class MapDataTypes
      * The purpose of explicit private constructor is
      * to prevent an instance initialization.
      *
-     * @param void
      */
     private function __construct()
     {
@@ -42,7 +43,7 @@ class MapDataTypes
      *
      * @var array
      */
-    private static $arrMySqlPgSqlTypesMap = [
+    private static array $arrMySqlPgSqlTypesMap = [
         'json' => [
             'increased_size' => '',
             'type' => 'json',
@@ -266,19 +267,45 @@ class MapDataTypes
      * @param string $strMySqlDataType
      * @return string
      */
-    public static function map($strMySqlDataType)
+    public static function map(string $strMySqlDataType): string
     {
-        $strRetVal = '';
+        $strDataType = '';
+        $arrDataType = '';
         $arrDataTypeDetails = explode(' ', $strMySqlDataType);
-        $boolIncreaseOriginalSize = in_array('unsigned', $arrDataTypeDetails) || in_array('zerofill', $arrDataTypeDetails);
+        $boolIncreaseOriginalSize = in_array('unsigned', $arrDataTypeDetails) ||
+            in_array('zerofill', $arrDataTypeDetails);
         $strMySqlDataType = $arrDataTypeDetails[0];
         $strMySqlDataType = strtolower($strMySqlDataType);
         $parenthesesFirstOccurrence = strpos($strMySqlDataType, '(');
-        $parenthesesLastOccurrence = false;
 
+        return self::getArrMySqlPgSqlTypesMap(
+            $parenthesesFirstOccurrence,
+            $boolIncreaseOriginalSize,
+            $strDataType,
+            $arrDataType,
+            $strMySqlDataType
+        );
+    }
+
+    /**
+     * @param $parenthesesFirstOccurrence
+     * @param $boolIncreaseOriginalSize
+     * @param $strDataType
+     * @param $arrDataType
+     * @param $strMySqlDataType
+     * @return string
+     */
+    public static function getArrMySqlPgSqlTypesMap(
+        $parenthesesFirstOccurrence,
+        $boolIncreaseOriginalSize,
+        $strDataType,
+        $arrDataType,
+        $strMySqlDataType
+    ): string {
+        $parenthesesLastOccurrence = false;
         if (false === $parenthesesFirstOccurrence) {
             // No parentheses detected.
-            $strRetVal = $boolIncreaseOriginalSize
+            $strVal = $boolIncreaseOriginalSize
                 ? self::$arrMySqlPgSqlTypesMap[$strMySqlDataType]['increased_size']
                 : self::$arrMySqlPgSqlTypesMap[$strMySqlDataType]['type'];
         } else {
@@ -286,39 +313,42 @@ class MapDataTypes
             $parenthesesLastOccurrence = strpos($strMySqlDataType, ')');
             $arrDataType = explode('(', $strMySqlDataType);
             $strDataType = strtolower($arrDataType[0]);
-
-            if ('enum' == $strDataType || 'set' == $strDataType) {
-                $strRetVal = 'varchar(255)';
-            } elseif ('decimal' == $strDataType || 'numeric' == $strDataType) {
-                $strRetVal = self::$arrMySqlPgSqlTypesMap[$strDataType]['type'] . '(' . $arrDataType[1];
-            } elseif ('decimal(19,2)' == $strMySqlDataType) {
-                $strRetVal = $boolIncreaseOriginalSize
-                    ? self::$arrMySqlPgSqlTypesMap[$strDataType]['increased_size']
-                    : self::$arrMySqlPgSqlTypesMap[$strDataType]['type'];
-            } elseif (self::$arrMySqlPgSqlTypesMap[$strDataType]['mySqlVarLenPgSqlFixedLen']) {
-                // Should be converted without a length definition.
-                $strRetVal = $boolIncreaseOriginalSize
-                    ? self::$arrMySqlPgSqlTypesMap[$strDataType]['increased_size']
-                    : self::$arrMySqlPgSqlTypesMap[$strDataType]['type'];
-            } else {
-                // Should be converted with a length definition.
-                $strRetVal = $boolIncreaseOriginalSize
-                    ? self::$arrMySqlPgSqlTypesMap[$strDataType]['increased_size'] . '(' . $arrDataType[1]
-                    : self::$arrMySqlPgSqlTypesMap[$strDataType]['type'] . '(' . $arrDataType[1];
-            }
-
-            // Prevent incompatible length (CHARACTER(0) or CHARACTER VARYING(0)).
-            switch ($strRetVal) {
-                case 'character(0)':
-                    $strRetVal = 'character(1)';
-                    break;
-
-                case 'character varying(0)':
-                    $strRetVal = 'character varying(1)';
-                    break;
-            }
+        }
+        if ('enum' == $strDataType || 'set' == $strDataType) {
+            $strVal = 'varchar(255)';
+        } elseif ('decimal' == $strDataType || 'numeric' == $strDataType) {
+            $strVal = self::$arrMySqlPgSqlTypesMap[$strDataType]['type'] . '(' . $arrDataType[1];
+        } elseif ('decimal(19,2)' == $strMySqlDataType) {
+            $strVal = $boolIncreaseOriginalSize
+                ? self::$arrMySqlPgSqlTypesMap[$strDataType]['increased_size']
+                : self::$arrMySqlPgSqlTypesMap[$strDataType]['type'];
+        } elseif (self::$arrMySqlPgSqlTypesMap[$strDataType]['mySqlVarLenPgSqlFixedLen']) {
+            // Should be converted without a length definition.
+            $strVal = $boolIncreaseOriginalSize
+                ? self::$arrMySqlPgSqlTypesMap[$strDataType]['increased_size']
+                : self::$arrMySqlPgSqlTypesMap[$strDataType]['type'];
+        } else {
+            // Should be converted with a length definition.
+            $strVal = $boolIncreaseOriginalSize
+                ? self::$arrMySqlPgSqlTypesMap[$strDataType]['increased_size'] . '(' . $arrDataType[1]
+                : self::$arrMySqlPgSqlTypesMap[$strDataType]['type'] . '(' . $arrDataType[1];
         }
 
-        return ' ' . strtoupper($strRetVal) . ' ';
+
+        return ' ' . strtoupper((new MapDataTypes())->verifyVal($strVal) . ' ');
+    }
+    public function verifyVal($strVal)
+    {
+        // Prevent incompatible length (CHARACTER(0) or CHARACTER VARYING(0)).
+        switch ($strVal) {
+            case 'character(0)':
+                $strVal = 'character(1)';
+                break;
+
+            case 'character varying(0)':
+                $strVal = 'character varying(1)';
+                break;
+        }
+        return $strVal;
     }
 }
