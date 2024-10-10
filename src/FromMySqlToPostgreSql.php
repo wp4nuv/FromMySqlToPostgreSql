@@ -21,10 +21,10 @@ namespace App;
  * If not, see <http://www.gnu.org/licenses/gpl.txt>.
  */
 
+use App\MapDataTypes as MapDataTypes;
+use App\ViewGenerator as ViewGenerator;
 use PDO;
 use PDOException;
-use App\ViewGenerator as ViewGenerator;
-use App\MapDataTypes as MapDataTypes;
 
 /**
  * This class performs structure and data migration from MySql database to PostgreSql database.
@@ -193,7 +193,6 @@ class FromMySqlToPostgreSql
      * @var string
      */
     private string $sql;
-    private string $sqlCopy;
 
 
     /**
@@ -206,7 +205,7 @@ class FromMySqlToPostgreSql
     {
         if (!extension_loaded('pgsql')) {
             echo "Postgresql not enabled: you need the 'pgsql' module.\n";
-            exit(1);
+            return;
         }
         if (!extension_loaded('pdo_mysql')) {
             echo "Postgresql not enabled: you need the 'pdo_mysql' module.\n";
@@ -312,7 +311,7 @@ class FromMySqlToPostgreSql
      *
      * @return void
      */
-    private function connect()
+    private function connect(): void
     {
         if (empty($this->mysql)) {
             $arrSrcInput = explode(',', $this->strSourceConString, 3);
@@ -366,32 +365,7 @@ class FromMySqlToPostgreSql
         return $strRetVal;
     }
 
-    /**
-     * Outputs given log.
-     * Writes given string to the "common logs" file.
-     *
-     * @param string $strLog
-     * @param bool $boolIsError
-     * @return void
-     */
-    private function log(string $strLog, bool $boolIsError = false)
-    {
-        if (!$boolIsError) {
-            echo $strLog;
-        }
 
-        if (!empty($this->strWriteCommonLogTo)) {
-            if (is_resource($this->resourceCommonLog)) {
-                fwrite($this->resourceCommonLog, $strLog);
-            } else {
-                $this->resourceCommonLog = fopen($this->strWriteCommonLogTo, 'a');
-
-                if (is_resource($this->resourceCommonLog)) {
-                    fwrite($this->resourceCommonLog, $strLog);
-                }
-            }
-        }
-    }
 
     /**
      * Writes a detailed error message to the log file, if specified.
@@ -401,7 +375,7 @@ class FromMySqlToPostgreSql
      * @param string $strSql
      * @return void
      */
-    private function generateError(PDOException $exception, string $strMessage, string $strSql = '')
+    private function generateError(PDOException $exception, string $strMessage, string $strSql = ''): void
     {
         $strError = PHP_EOL . "\t-- " . $strMessage . PHP_EOL
             . "\t-- PDOException code: " . $exception->getCode() . PHP_EOL
@@ -434,7 +408,7 @@ class FromMySqlToPostgreSql
      *
      * @return bool
      */
-    private function loadStructureToMigrate(): bool
+    private function structureToMigrate(): bool
     {
         $boolRetVal = false;
 
@@ -538,7 +512,7 @@ class FromMySqlToPostgreSql
      * @param string $strViewName
      * @return void
      */
-    private function createView(string $strViewName)
+    private function createView(string $strViewName): void
     {
         $this->sql = '';
         $this->boolViewErrorDirExists = true;
@@ -686,8 +660,7 @@ class FromMySqlToPostgreSql
             $this->log("\t-- The following contains rows rejected by PostgreSQL for table " .
                 "\"" . $this->strSchema . "\".\"" . $strTableName . "\"\n");
             foreach ($copyArray as $copyrow) {
-                if (
-                    !@pg_copy_from($this->pgsqldata, "\"" . $this->strSchema . "\".\"" .
+                if (!@pg_copy_from($this->pgsqldata, "\"" . $this->strSchema . "\".\"" .
                         $strTableName . "\"", [$copyrow])
                 ) {
                     $this->log($copyrow);
@@ -722,7 +695,7 @@ class FromMySqlToPostgreSql
     ): int {
         $intRetVal = 0;
         $this->sql = '';
-        $this->sqlCopy = '';
+        $sqlCopy = '';
         $copiedCount = 0;
         $copyArray = [];
 
@@ -737,8 +710,7 @@ class FromMySqlToPostgreSql
 
             // Calculate column types at the top for performance
             foreach ($arrColumns as $column) {
-                if (
-                    stripos($column['Type'], 'blob') !== false
+                if (stripos($column['Type'], 'blob') !== false
                     || stripos($column['Type'], 'binary') !== false
                 ) {
                     $arrBinaryFields[$column['Field']] = true;
@@ -787,7 +759,7 @@ class FromMySqlToPostgreSql
             $copyArray = [];
         } catch (PDOException $e) {
             $strMsg = __METHOD__ . PHP_EOL;
-            $this->generateError($e, $strMsg, $this->sql . PHP_EOL . $this->sqlCopy);
+            $this->generateError($e, $strMsg, $this->sql . PHP_EOL . $sqlCopy);
             $this->log("\t--Following MySQL query will return a data set, rejected by 
             PostgreSQL:\n" . $this->sql . "\n");
         }
@@ -806,19 +778,16 @@ class FromMySqlToPostgreSql
         $strRetVal = '';
 
         foreach ($arrColumns as $arrColumn) {
-            if (
-                stripos($arrColumn['Type'], 'geometry') !== false
+            if (stripos($arrColumn['Type'], 'geometry') !== false
                 || stripos($arrColumn['Type'], 'point') !== false
                 || stripos($arrColumn['Type'], 'linestring') !== false
                 || stripos($arrColumn['Type'], 'polygon') !== false
             ) {
                 $strRetVal .= 'HEX(ST_AsWKB(`' . $arrColumn['Field'] . '`)) AS `' . $arrColumn['Field'] . '`,';
-            } elseif (
-                stripos($arrColumn['Type'], 'bit') !== false
+            } elseif (stripos($arrColumn['Type'], 'bit') !== false
             ) {
                 $strRetVal .= 'BIN(`' . $arrColumn['Field'] . '`) AS `' . $arrColumn['Field'] . '`,';
-            } elseif (
-                stripos($arrColumn['Type'], 'timestamp') !== false
+            } elseif (stripos($arrColumn['Type'], 'timestamp') !== false
                 || stripos($arrColumn['Type'], 'date') !== false
             ) {
                 $strRetVal .= 'IF(`' . $arrColumn['Field']
@@ -911,7 +880,7 @@ class FromMySqlToPostgreSql
      * @param array $arrColumns
      * @return void
      */
-    private function processNull(string $strTableName, array $arrColumns)
+    private function processNull(string $strTableName, array $arrColumns): void
     {
         $this->sql = '';
 
@@ -948,7 +917,7 @@ class FromMySqlToPostgreSql
      * @param array $arrColumns
      * @return void
      */
-    private function processComment(string $strTableName, array $arrColumns)
+    private function processComment(string $strTableName, array $arrColumns): void
     {
         $this->sql = '';
 
@@ -983,7 +952,7 @@ class FromMySqlToPostgreSql
      * @param array $arrColumns
      * @return void
      */
-    private function processDefault(string $strTableName, array $arrColumns)
+    private function processDefault(string $strTableName, array $arrColumns): void
     {
         $this->log(
             PHP_EOL . "\t" . '-- Set default values for table: "'
@@ -1058,7 +1027,7 @@ class FromMySqlToPostgreSql
      * @param array $arrColumns
      * @return void
      */
-    private function processEnum(string $strTableName, array $arrColumns)
+    private function processEnum(string $strTableName, array $arrColumns): void
     {
         $this->log(PHP_EOL . "\t" . '-- Set "ENUMs" for table "' . $this->strSchema .
             '"."' . $strTableName . '"...' . PHP_EOL);
@@ -1113,7 +1082,7 @@ class FromMySqlToPostgreSql
      * @param array $arrColumns
      * @return void
      */
-    private function createSequence(string $strTableName, array $arrColumns)
+    private function createSequence(string $strTableName, array $arrColumns): void
     {
         $this->sql = '';
         $strSeqName = '';
@@ -1232,7 +1201,7 @@ class FromMySqlToPostgreSql
      * @param array $arrColumns
      * @return void
      */
-    private function processIndexAndKey(string $strTableName, array $arrColumns)
+    private function processIndexAndKey(string $strTableName, array $arrColumns): void
     {
         $this->sql = '';
 
@@ -1281,12 +1250,12 @@ class FromMySqlToPostgreSql
                     $strColumnList = '(' . implode(',', $arrIndex['column_name']) . ')';
                     $strCurrentAction = 'uniqueindex';
                     $this->sql = "ALTER TABLE \"" . $this->strSchema . "\".\"" . $strTableName . "\" 
-                    ADD CONSTRAINT \"" . $strIndexName . "\" UNIQUE " . $strColumnList . ";";
+                    ADD CONSTRAINT \"" . $strIndexName . "\"UNIQUE " . $strColumnList . ";";
                 } else {
                     // "schema_idxname_{integer}_idx" - is NOT a mistake.
                     $strColumnName = str_replace('"', '', $arrIndex['column_name'][0]) . $intCounter;
                     $strCurrentAction = 'index';
-                    $this->sql = 'CREATE  INDEX "'
+                    $this->sql = 'CREATE INDEX "'
                         . $this->strSchema . '_' . $strTableName . '_' . $strColumnName . '_idx" ON "'
                         . $this->strSchema . '"."' . $strTableName . '" ' . $arrIndex['Index_type']
                         . ' (' . implode(',', $arrIndex['column_name']) . ');';
@@ -1329,7 +1298,7 @@ class FromMySqlToPostgreSql
      * @param string $strTableName
      * @return void
      */
-    private function processForeignKey($strTableName)
+    private function processForeignKey(string $strTableName): void
     {
         $this->sql = '';
 
@@ -1436,7 +1405,7 @@ class FromMySqlToPostgreSql
      * @param string $strTableName
      * @return bool
      */
-    private function setTableConstraints($strTableName)
+    private function setTableConstraints(string $strTableName): bool
     {
         $this->log("\t" . '-- Trying to set table constraints for "' . $this->strSchema .
             '"."' . $strTableName . '"...' . PHP_EOL);
@@ -1553,8 +1522,7 @@ class FromMySqlToPostgreSql
             $floatStartCopy = microtime(true);
             $intRecords = 0;
 
-            if (
-                !$this->isDataOnly
+            if (!$this->isDataOnly
                 && !$this->createTable($arrTable['Tables_in_' . $this->strMySqlDbName])
             ) {
                 return false;
@@ -1579,7 +1547,7 @@ class FromMySqlToPostgreSql
     /**
      * Set table constraints.
      */
-    private function createConstraints()
+    private function createConstraints(): void
     {
         foreach ($this->arrTablesToMigrate as $arrTable) {
             $this->setTableConstraints($arrTable['Tables_in_' . $this->strMySqlDbName]);
@@ -1590,7 +1558,7 @@ class FromMySqlToPostgreSql
     /**
      * Set foreign key constraints.
      */
-    private function createForeignKeys()
+    private function createForeignKeys(): void
     {
         foreach ($this->arrTablesToMigrate as $arrTable) {
             $this->processForeignKey($arrTable['Tables_in_' . $this->strMySqlDbName]);
@@ -1601,7 +1569,7 @@ class FromMySqlToPostgreSql
     /**
      * Attempt to create views.
      */
-    private function createViews()
+    private function createViews(): void
     {
         foreach ($this->arrViewsToMigrate as $arrView) {
             $this->createView($arrView['Tables_in_' . $this->strMySqlDbName]);
@@ -1614,7 +1582,7 @@ class FromMySqlToPostgreSql
      *
      * @return void
      */
-    public function migrate()
+    public function migrate(): void
     {
         $intTimeBegin = time();
         $this->log(
@@ -1637,7 +1605,7 @@ class FromMySqlToPostgreSql
             $this->log('-- New schema "' . $this->strSchema . '" was successfully created...' . PHP_EOL);
         }
 
-        if (!$this->loadStructureToMigrate()) {
+        if (!$this->structureToMigrate()) {
             $this->log('-- Script is terminated.' . PHP_EOL);
             $groundsForExit = true;
         } else {
