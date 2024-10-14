@@ -25,6 +25,7 @@ use PDO;
 use PDOException;
 use App\ViewGenerator as ViewGenerator;
 use App\MapDataTypes as MapDataTypes;
+use PHPUnit\Exception;
 
 /**
  * This class performs structure and data migration from MySql database to PostgreSql database.
@@ -56,7 +57,7 @@ class FromMySqlToPostgreSql
      *
      * @var \resource
      */
-    private $pgsqldata;
+    private $pgSqlData;
 
     /**
      * Encoding of target (PostgreSql) server.
@@ -194,6 +195,7 @@ class FromMySqlToPostgreSql
      */
     private string $sql;
     private string $sqlCopy;
+    private Utilities $utilities;
 
 
     /**
@@ -206,7 +208,7 @@ class FromMySqlToPostgreSql
     {
         if (!extension_loaded('pgsql')) {
             echo "Postgresql not enabled: you need the 'pgsql' module.\n";
-            exit(1);
+            return;
         }
         if (!extension_loaded('pdo_mysql')) {
             echo "Postgresql not enabled: you need the 'pdo_mysql' module.\n";
@@ -241,54 +243,10 @@ class FromMySqlToPostgreSql
             return;
         }
 
-        $this->arrTablesToMigrate = [];
-        $this->arrViewsToMigrate = [];
-        $this->arrSummaryReport = [];
-        $this->strTempDirectory = $arrConfig['temp_dir_path'];
-        $this->strLogsDirectoryPath = $arrConfig['logs_dir_path'];
-        $this->strWriteCommonLogTo = $arrConfig['logs_dir_path'] . '/all.log';
-        $this->strWriteSummaryTo = $arrConfig['logs_dir_path'] . '/report-only.log';
-        $this->strWriteErrorLogTo = $arrConfig['logs_dir_path'] . '/errors-only.log';
-        $this->strViewErrorsDirPath = $arrConfig['logs_dir_path'] . '/not_created_views';
-        $this->strEncoding = $arrConfig['config']['encoding'] ?? 'UTF-8';
-        $this->floatDataChunkSize = isset($arrConfig['config']['data_chunk_size']) ?
-            (float)$arrConfig['config']['data_chunk_size'] : 10;
-        $this->floatDataChunkSize = max($this->floatDataChunkSize, 1);
-        $this->strSourceConString = $arrConfig['config']['source'];
-        $this->strTargetConString = $arrConfig['config']['target'];
-        $this->strMySqlDbName = $this->extractDbName($this->strSourceConString);
-        $this->strSchema = $arrConfig['config']['schema'] ?? '';
-        $this->isDataOnly = isset($arrConfig['config']['data_only']) &&
-            (bool)$arrConfig['config']['data_only'];
+        $this->setDefaults($arrConfig);
 
-        if (!file_exists($this->strTempDirectory)) {
-            mkdir($this->strTempDirectory);
-
-            if (!file_exists($this->strTempDirectory)) {
-                echo PHP_EOL,
-                '-- Cannot perform a migration due to impossibility to create "temporary_directory": ',
-                $this->strTempDirectory,
-                PHP_EOL;
-
-                return;
-            }
-        }
-
-        if (!file_exists($this->strLogsDirectoryPath)) {
-            mkdir($this->strLogsDirectoryPath);
-
-            if (!file_exists($this->strLogsDirectoryPath)) {
-                echo PHP_EOL, '--Cannot create logs directory: ', $this->strLogsDirectoryPath, PHP_EOL;
-            }
-        }
-
-        if (!empty($this->strWriteErrorLogTo)) {
-            $this->resourceErrorLog = fopen($this->strWriteErrorLogTo, 'a');
-        }
-
-        if (!empty($this->strWriteCommonLogTo)) {
-            $this->resourceCommonLog = fopen($this->strWriteCommonLogTo, 'a');
-        }
+        $this->createDefaultAssets();
+        $this->utilities = new Utilities($this);
     }
 
     /**
@@ -327,43 +285,16 @@ class FromMySqlToPostgreSql
             $this->pgsql->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
             $this->pgsql->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             // These are poor man's replacements to avoid 2 connection strings at this point in time.
-            $datadsn = str_replace('pgsql:', '', $arrDestInput[0]);
-            $datadsn = str_replace(';', ' ', $datadsn);
-            $this->pgsqldata = pg_connect($datadsn . " user=" . $arrDestInput[1] . " password=" . $arrDestInput[2]);
-            if (!$this->pgsqldata) {
+            $dataDsn = str_replace('pgsql:', '', $arrDestInput[0]);
+            $dataDsn = str_replace(';', ' ', $dataDsn);
+            $this->pgSqlData = pg_connect($dataDsn . " user=" . $arrDestInput[1] . " password=" . $arrDestInput[2]);
+            if (!$this->pgSqlData) {
                 echo pg_last_error();
 
                 return;
             }
-            pg_query($this->pgsqldata, "SET synchronous_commit=off");
+            pg_query($this->pgSqlData, "SET synchronous_commit=off");
         }
-    }
-
-    /**
-     * Extract database name from given query-string.
-     *
-     * @param string $strConString
-     * @return string
-     */
-    private function extractDbName(string $strConString): string
-    {
-        $strRetVal = '';
-        $arrParams = explode(',', $strConString, 3);
-        $arrParams2 = explode(';', $arrParams[0]);
-
-        foreach ($arrParams2 as $strPair) {
-            $arrPair = explode('=', $strPair);
-
-            if ('dbname' == $arrPair[0]) {
-                $strRetVal = $arrPair[1];
-                unset($strPair);
-                break;
-            }
-            unset($strPair);
-        }
-        unset($arrParams, $arrParams2);
-
-        return $strRetVal;
     }
 
     /**
@@ -376,21 +307,7 @@ class FromMySqlToPostgreSql
      */
     private function log(string $strLog, bool $boolIsError = false)
     {
-        if (!$boolIsError) {
-            echo $strLog;
-        }
-
-        if (!empty($this->strWriteCommonLogTo)) {
-            if (is_resource($this->resourceCommonLog)) {
-                fwrite($this->resourceCommonLog, $strLog);
-            } else {
-                $this->resourceCommonLog = fopen($this->strWriteCommonLogTo, 'a');
-
-                if (is_resource($this->resourceCommonLog)) {
-                    fwrite($this->resourceCommonLog, $strLog);
-                }
-            }
-        }
+        $this->utilities->log($strLog, $boolIsError);
     }
 
     /**
@@ -403,30 +320,7 @@ class FromMySqlToPostgreSql
      */
     private function generateError(PDOException $exception, string $strMessage, string $strSql = '')
     {
-        $strError = PHP_EOL . "\t-- " . $strMessage . PHP_EOL
-            . "\t-- PDOException code: " . $exception->getCode() . PHP_EOL
-            . "\t-- File: " . $exception->getFile() . PHP_EOL
-            . "\t-- Line: " . $exception->getLine() . PHP_EOL
-            . "\t-- Message: " . $exception->getMessage()
-            . (empty($strSql) ? '' : PHP_EOL . "\t-- SQL: " . $strSql . PHP_EOL)
-            . PHP_EOL
-            . "\t-------------------------------------------------------"
-            . PHP_EOL . PHP_EOL;
-
-        $this->log($strError, true);
-
-        if (!empty($this->strWriteErrorLogTo)) {
-            if (is_resource($this->resourceErrorLog)) {
-                fwrite($this->resourceErrorLog, $strError);
-            } else {
-                $this->resourceErrorLog = fopen($this->strWriteErrorLogTo, 'a');
-
-                if (is_resource($this->resourceErrorLog)) {
-                    fwrite($this->resourceErrorLog, $strError);
-                }
-            }
-        }
-        unset($strError);
+        $this->utilities->generateError($exception, $strMessage, $strSql);
     }
 
     /**
@@ -661,11 +555,7 @@ class FromMySqlToPostgreSql
      */
     private function escapeValue(string $value): string
     {
-        return str_replace(
-            ["\\", "\n", "\r", "\t"],
-            ["\\\\", "\\n", "\\r", "\\t"],
-            $value
-        );
+        return $this->utilities->escapeValue($value);
     }
 
     /**
@@ -681,16 +571,16 @@ class FromMySqlToPostgreSql
         // Attempt to copy, if it fails, do one at a time to ensure we find all the errors.
         // If the data is valid, we perform fast, otherwise we ensure correctness at the cost of speed.
 
-        if (!@pg_copy_from($this->pgsqldata, "\"" . $this->strSchema . "\".\"" . $strTableName . "\"", $copyArray)) {
+        if (!@pg_copy_from($this->pgSqlData, "\"" . $this->strSchema . "\".\"" . $strTableName . "\"", $copyArray)) {
             // do each row, logging the failed ones.
             $this->log("\t-- The following contains rows rejected by PostgreSQL for table " .
                 "\"" . $this->strSchema . "\".\"" . $strTableName . "\"\n");
-            foreach ($copyArray as $copyrow) {
+            foreach ($copyArray as $copyRow) {
                 if (
-                    !@pg_copy_from($this->pgsqldata, "\"" . $this->strSchema . "\".\"" .
-                        $strTableName . "\"", [$copyrow])
+                    !@pg_copy_from($this->pgSqlData, "\"" . $this->strSchema . "\".\"" .
+                        $strTableName . "\"", [$copyRow])
                 ) {
-                    $this->log($copyrow);
+                    $this->log($copyRow);
                 } else {
                     $intRetVal++;
                 }
@@ -732,7 +622,7 @@ class FromMySqlToPostgreSql
             $stmt = $this->mysql->prepare($this->sql);
             $arrRow = $stmt->fetchAll(PDO::FETCH_ASSOC);
             $this->mysql->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
-            $mysqlResult = $stmt->execute();
+            //$stmt->execute();
             $arrBinaryFields = [];
 
             // Calculate column types at the top for performance
@@ -1679,5 +1569,117 @@ class FromMySqlToPostgreSql
             . ':' . ($intSeconds < 10 ? '0' . $intSeconds : $intSeconds)
             . ' (hours:minutes:seconds)' . PHP_EOL . PHP_EOL
         );
+    }
+
+    /**
+     * @param array $arrConfig
+     * @return void
+     */
+    public function setDefaults(array $arrConfig): void
+    {
+        $this->arrTablesToMigrate = [];
+        $this->arrViewsToMigrate = [];
+        $this->arrSummaryReport = [];
+        $this->strTempDirectory = $arrConfig['temp_dir_path'];
+        $this->strLogsDirectoryPath = $arrConfig['logs_dir_path'];
+        $this->strWriteCommonLogTo = $arrConfig['logs_dir_path'] . '/all.log';
+        $this->strWriteSummaryTo = $arrConfig['logs_dir_path'] . '/report-only.log';
+        $this->strWriteErrorLogTo = $arrConfig['logs_dir_path'] . '/errors-only.log';
+        $this->strViewErrorsDirPath = $arrConfig['logs_dir_path'] . '/not_created_views';
+        $this->strEncoding = $arrConfig['config']['encoding'] ?? 'UTF-8';
+        $this->floatDataChunkSize = isset($arrConfig['config']['data_chunk_size']) ?
+            (float)$arrConfig['config']['data_chunk_size'] : 10;
+        $this->floatDataChunkSize = max($this->floatDataChunkSize, 1);
+        $this->strSourceConString = $arrConfig['config']['source'];
+        $this->strTargetConString = $arrConfig['config']['target'];
+        $this->strMySqlDbName = Utilities::extractDbName($this->strSourceConString);
+        $this->strSchema = $arrConfig['config']['schema'] ?? '';
+        $this->isDataOnly = isset($arrConfig['config']['data_only']) &&
+            (bool)$arrConfig['config']['data_only'];
+    }
+
+    /**
+     * @return void
+     */
+    public function createDefaultAssets(): void
+    {
+        if (!file_exists($this->strTempDirectory)) {
+            try {
+                mkdir($this->strTempDirectory);
+            } catch (\Exception $exception) {
+                echo PHP_EOL,
+                '-- Cannot perform a migration due to impossibility to create "temporary_directory": ',
+                $this->strTempDirectory,
+                PHP_EOL;
+
+                return;
+            }
+        }
+
+        if (!file_exists($this->strLogsDirectoryPath)) {
+            try {
+                mkdir($this->strLogsDirectoryPath);
+            } catch (\Exception $exception) {
+                echo PHP_EOL, '--Cannot create logs directory: ', $this->strLogsDirectoryPath, PHP_EOL;
+            }
+            try {
+                $this->resourceErrorLog = fopen($this->strWriteErrorLogTo, 'a');
+            } catch (\Exception $exception) {
+                echo PHP_EOL, '--Cannot create Resource Error Logs: ', $this->resourceErrorLog, PHP_EOL;
+            }
+            try {
+                $this->resourceCommonLog = fopen($this->strWriteCommonLogTo, 'a');
+            } catch (\Exception $exception) {
+                echo PHP_EOL, '--Cannot create Resource Common Logs: ', $this->resourceCommonLog, PHP_EOL;
+            }
+        }
+    }
+
+    /**
+     * @return string
+     */
+    public function getStrWriteErrorLogTo(): string
+    {
+        return $this->strWriteErrorLogTo;
+    }
+
+    /**
+     * @return resource
+     */
+    public function getResourceErrorLog()
+    {
+        return $this->resourceErrorLog;
+    }
+
+    /**
+     * @param resource $resourceErrorLog
+     */
+    public function setResourceErrorLog($resourceErrorLog): void
+    {
+        $this->resourceErrorLog = $resourceErrorLog;
+    }
+
+    /**
+     * @return string
+     */
+    public function getStrWriteCommonLogTo(): string
+    {
+        return $this->strWriteCommonLogTo;
+    }
+
+    /**
+     * @return resource
+     */
+    public function getResourceCommonLog()
+    {
+        return $this->resourceCommonLog;
+    }
+
+    /**
+     * @param resource $resourceCommonLog
+     */
+    public function setResourceCommonLog($resourceCommonLog): void
+    {
+        $this->resourceCommonLog = $resourceCommonLog;
     }
 }
