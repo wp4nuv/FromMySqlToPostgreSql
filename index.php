@@ -3,6 +3,7 @@
 use App\FromMySqlToPostgreSql;
 
 require_once('migration/FromMySqlToPostgreSql/FromMySqlToPostgreSql.php');
+require './vendor/autoload.php';
 
 /*
  * This file is a part of "FromMySqlToPostgreSql" - the database migration tool.
