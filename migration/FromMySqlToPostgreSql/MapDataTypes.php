@@ -43,7 +43,7 @@ class MapDataTypes
      *
      * @var array
      */
-    private static array $arrMySqlPgSqlTypesMap = [
+    private static array $mySqlPgSqlTypesMap = [
         'json' => [
             'increased_size' => '',
             'type' => 'json',
@@ -272,15 +272,15 @@ class MapDataTypes
         $strDataType = '';
         $arrDataType = '';
         $arrDataTypeDetails = explode(' ', $strMySqlDataType);
-        $boolIncreaseOriginalSize = in_array('unsigned', $arrDataTypeDetails) ||
+        $increaseOriginalSize = in_array('unsigned', $arrDataTypeDetails) ||
             in_array('zerofill', $arrDataTypeDetails);
         $strMySqlDataType = $arrDataTypeDetails[0];
         $strMySqlDataType = strtolower($strMySqlDataType);
-        $parenthesesFirstOccurrence = strpos($strMySqlDataType, '(');
+        $firstOccurrence = strpos($strMySqlDataType, '(');
 
-        return self::getArrMySqlPgSqlTypesMap(
-            $parenthesesFirstOccurrence,
-            $boolIncreaseOriginalSize,
+        return self::getMySqlPgSqlTypesMap(
+            $firstOccurrence,
+            $increaseOriginalSize,
             $strDataType,
             $arrDataType,
             $strMySqlDataType
@@ -288,50 +288,44 @@ class MapDataTypes
     }
 
     /**
-     * @param $parenthesesFirstOccurrence
-     * @param $boolIncreaseOriginalSize
+     * @param $firstOccurrence
+     * @param $increaseOriginalSize
      * @param $strDataType
      * @param $arrDataType
      * @param $strMySqlDataType
      * @return string
      */
-    public static function getArrMySqlPgSqlTypesMap(
-        $parenthesesFirstOccurrence,
-        $boolIncreaseOriginalSize,
+    public static function getMySqlPgSqlTypesMap(
+        $firstOccurrence,
+        $increaseOriginalSize,
         $strDataType,
         $arrDataType,
         $strMySqlDataType
     ): string {
-        $parenthesesLastOccurrence = false;
-        if (false === $parenthesesFirstOccurrence) {
+        $lastOccurrence = false;
+        if (false === $firstOccurrence) {
             // No parentheses detected.
-            $strVal = $boolIncreaseOriginalSize
-                ? self::$arrMySqlPgSqlTypesMap[$strMySqlDataType]['increased_size']
-                : self::$arrMySqlPgSqlTypesMap[$strMySqlDataType]['type'];
+            $strVal = $increaseOriginalSize
+                ? self::$mySqlPgSqlTypesMap[$strMySqlDataType]['increased_size']
+                : self::$mySqlPgSqlTypesMap[$strMySqlDataType]['type'];
         } else {
             // Parentheses detected.
-            $parenthesesLastOccurrence = strpos($strMySqlDataType, ')');
+            $lastOccurrence = strpos($strMySqlDataType, ')');
             $arrDataType = explode('(', $strMySqlDataType);
             $strDataType = strtolower($arrDataType[0]);
         }
         if ('enum' == $strDataType || 'set' == $strDataType) {
             $strVal = 'varchar(255)';
         } elseif ('decimal' == $strDataType || 'numeric' == $strDataType) {
-            $strVal = self::$arrMySqlPgSqlTypesMap[$strDataType]['type'] . '(' . $arrDataType[1];
+            $strVal = self::getNumeric($strDataType, $arrDataType[1]);
         } elseif ('decimal(19,2)' == $strMySqlDataType) {
-            $strVal = $boolIncreaseOriginalSize
-                ? self::$arrMySqlPgSqlTypesMap[$strDataType]['increased_size']
-                : self::$arrMySqlPgSqlTypesMap[$strDataType]['type'];
-        } elseif (self::$arrMySqlPgSqlTypesMap[$strDataType]['mySqlVarLenPgSqlFixedLen']) {
+            $strVal = self::extractedDecimal($increaseOriginalSize, $strDataType);
+        } elseif (self::$mySqlPgSqlTypesMap[$strDataType]['mySqlVarLenPgSqlFixedLen']) {
             // Should be converted without a length definition.
-            $strVal = $boolIncreaseOriginalSize
-                ? self::$arrMySqlPgSqlTypesMap[$strDataType]['increased_size']
-                : self::$arrMySqlPgSqlTypesMap[$strDataType]['type'];
+            $strVal = self::extractNoLength($increaseOriginalSize, $strDataType);
         } else {
             // Should be converted with a length definition.
-            $strVal = $boolIncreaseOriginalSize
-                ? self::$arrMySqlPgSqlTypesMap[$strDataType]['increased_size'] . '(' . $arrDataType[1]
-                : self::$arrMySqlPgSqlTypesMap[$strDataType]['type'] . '(' . $arrDataType[1];
+            $strVal = self::extractWithLength($increaseOriginalSize, $strDataType, $arrDataType[1]);
         }
 
 
@@ -350,5 +344,56 @@ class MapDataTypes
                 break;
         }
         return $strVal;
+    }
+
+    /**
+     * @param $strDataType
+     * @param $arrDataType
+     *
+     * @return string
+     */
+    public static function getNumeric($strDataType, $arrDataType): string
+    {
+        return self::$mySqlPgSqlTypesMap[$strDataType]['type'] . '(' . $arrDataType;
+    }
+
+    /**
+     * @param $increaseOriginalSize
+     * @param $strDataType
+     *
+     * @return mixed
+     */
+    public static function extractedDecimal($increaseOriginalSize, $strDataType)
+    {
+        return $increaseOriginalSize
+            ? self::$mySqlPgSqlTypesMap[$strDataType]['increased_size']
+            : self::$mySqlPgSqlTypesMap[$strDataType]['type'];
+    }
+
+    /**
+     * @param $increaseOriginalSize
+     * @param $strDataType
+     *
+     * @return mixed
+     */
+    public static function extractNoLength($increaseOriginalSize, $strDataType)
+    {
+        return $increaseOriginalSize
+            ? self::$mySqlPgSqlTypesMap[$strDataType]['increased_size']
+            : self::$mySqlPgSqlTypesMap[$strDataType]['type'];
+    }
+
+    /**
+     * @param $increaseOriginalSize
+     * @param $strDataType
+     * @param $arrDataType
+     *
+     * @return string
+     */
+    public static function extractWithLength($increaseOriginalSize, $strDataType, $arrDataType): string
+    {
+        return $increaseOriginalSize
+            ? self::$mySqlPgSqlTypesMap[$strDataType]['increased_size'] . '(' . $arrDataType
+            : self::$mySqlPgSqlTypesMap[$strDataType]['type'] . '(' . $arrDataType;
     }
 }

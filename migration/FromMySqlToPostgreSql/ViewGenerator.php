@@ -53,20 +53,20 @@ class ViewGenerator
         $strMySqlViewCode = substr($strMySqlViewCode, $intQueryStart);
 
         $arrMySqlViewCode = explode(' ', $strMySqlViewCode);
-        $intMySqlViewCodeCount = count($arrMySqlViewCode);
+        $mySqlViewCodeCount = count($arrMySqlViewCode);
 
-        for ($i = 0; $i < $intMySqlViewCodeCount; $i++) {
+        for ($i = 0; $i < $mySqlViewCodeCount; $i++) {
             if (
                 ('from' == strtolower($arrMySqlViewCode[$i]) || 'join' == strtolower($arrMySqlViewCode[$i]))
-                && ($i + 1 < $intMySqlViewCodeCount)
+                && ($i + 1 < $mySqlViewCodeCount)
             ) {
                 // This code only handles a single set of "(" in the code, we assume MySQL outputs the same way always.
                 // Tables might be prefixed by (, so take care of that.
                 $bracketSize = strpos($arrMySqlViewCode[$i + 1], '"');
                 $brackets = $bracketSize == 0 ? '' : substr($arrMySqlViewCode[$i + 1], 0, $bracketSize);
-                $tablename = substr($arrMySqlViewCode[$i + 1], $bracketSize);
+                $tableName = substr($arrMySqlViewCode[$i + 1], $bracketSize);
 
-                $arrMySqlViewCode[$i + 1] = $brackets . '"' . $strSchema . '".' . $tablename;
+                $arrMySqlViewCode[$i + 1] = $brackets . '"' . $strSchema . '".' . $tableName;
             }
         }
 
