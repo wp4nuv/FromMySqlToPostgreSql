@@ -23,6 +23,7 @@
     "league/config": "^v1.2.0",
     "psr/log": "^1.1.4",
     "laminas/laminas-diactoros": "^2.17.0",
+    "monolog/monolog": "2.9.3",
     "symfony/error-handler": "^5.4",
     "laminas/laminas-httphandlerrunner": "^2.2",
     "doctrine/dbal": "^3.6",

@@ -2,8 +2,9 @@
 
 use App\FromMySqlToPostgreSql;
 
-require_once('migration/FromMySqlToPostgreSql/FromMySqlToPostgreSql.php');
 require './vendor/autoload.php';
+require_once('migration/FromMySqlToPostgreSql/FromMySqlToPostgreSql.php');
+
 
 /*
  * This file is a part of "FromMySqlToPostgreSql" - the database migration tool.
@@ -78,8 +79,8 @@ if (empty($argv[1])) {
     echo PHP_EOL, '-- Cannot perform a migration due to missing "config[.xml | .json]" file.', PHP_EOL;
 } else {
     $arrConfig['config'] = $config;
-    $arrConfig['temp_dir_path'] = __DIR__ . '/temporary_directory';
-    $arrConfig['logs_dir_path'] = __DIR__ . '/logs_directory';
+    $arrConfig['temp_dir_path'] = __DIR__ . '/temp';
+
 
     $migration = new FromMySqlToPostgreSql($arrConfig);
     $migration->migrate();
