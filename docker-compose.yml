@@ -1,12 +1,11 @@
 services:
   devcontainer:
-    build: .devcontainer/Dockerfile
+    build:
+      context: .devcontainer/
+      dockerfile: Dockerfile
     volumes:
-      - ./:/workspaces:cached
-    depends_on:
-      pgsql:
-        condition: service_healthy
-        restart: true
+      - ./src:/var/www/html:cached
+    network_mode: service:pgsql
     tty: true
     stdin_open: true
     command: bash
