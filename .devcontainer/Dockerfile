@@ -8,5 +8,9 @@ RUN install-php-extensions gd xdebug pdo pdo-mysql pdo-pgsql && \
     php composer-setup.php && \
     php -r "unlink('composer-setup.php');" && \
     mv composer.phar /usr/local/bin/composer && \
+    apt-get update && \
+    apt-get -y upgrade && \
     apt-get -y install git
+
+EXPOSE 9001
 LABEL authors="pedro.maldonado"
