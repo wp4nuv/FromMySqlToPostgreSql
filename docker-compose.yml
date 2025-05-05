@@ -1,6 +1,6 @@
 services:
   devcontainer:
-    build: ./.devcontainer/Dockerfile.dockerfile
+    build: .devcontainer/Dockerfile
     volumes:
       - ./:/workspaces:cached
     depends_on:
