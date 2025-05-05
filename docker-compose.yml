@@ -1,13 +1,14 @@
 services:
   devcontainer:
-    build: .devcontainer/Dockerfile
-    image: php82-cli
+    build: ./.devcontainer/Dockerfile.dockerfile
     volumes:
       - ./:/workspaces:cached
     depends_on:
       pgsql:
         condition: service_healthy
         restart: true
+    tty: true
+    stdin_open: true
     command: bash
 
   mysql:
