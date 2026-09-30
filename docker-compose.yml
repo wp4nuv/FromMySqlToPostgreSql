@@ -1,6 +1,6 @@
 services:
   devcontainer:
-    image: wp4nuv/devphp7.4
+    image: php:8.5-cli
     volumes:
       - ./:/workspaces:cached
     depends_on:
@@ -10,7 +10,7 @@ services:
     command: bash
 
   mysql:
-    image: mysql:8.0.29
+    image: mysql:lts
     restart: unless-stopped
     volumes:
         - mysql-data:/var/lib/mysql
