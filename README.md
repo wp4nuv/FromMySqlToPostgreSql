@@ -38,13 +38,18 @@ However, if you're not into Node.js, you can still use old and proven FromMySqlT
 
 <h3>SYSTEM REQUIREMENTS</h3>
 <ul>
-<li> <b>PHP (CLI) 5.4</b> or above </li>
+<li> <b>PHP (CLI) 8.5</b> </li>
 <li> <b>PDO_MYSQL</b> should be installed and enabled </li>
 <li> <b>PDO_PGSQL</b> should be installed and enabled </li>
 <li> <b>mbstring</b> should be installed and enabled </li>
 <li> <b>register_argc_argv</b> should be enabled (check php.ini).</li>
 <li> <b>postgis</b> should be installed and enabled to migrate spatial data (geometry type columns).</li>
 </ul>
+
+<h3>DEVELOPMENT ENVIRONMENT</h3>
+<p>The PHP 8.5 devcontainer builds the required runtime and starts pinned MySQL
+and PostgreSQL services. See <a href=".devcontainer/README.md">the devcontainer setup guide</a>
+for initialization, connection settings, and environment checks.</p>
 
 <h3>USAGE</h3>
 <p><b>1.</b> Create a new database.<br />&nbsp;&nbsp;&nbsp;
